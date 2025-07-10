@@ -27,7 +27,7 @@ export default function RawDataTableClient() {
     if (testSearch) params.set('test', testSearch);
     params.set('page', page.toString());
 
-    const res = await fetch(`/api/raw-data?${params.toString()}`);
+    const res = await fetch(`/api/dashboards?${params.toString()}`);
     const json = await res.json();
 
     setRows(json.data);
@@ -41,7 +41,7 @@ export default function RawDataTableClient() {
 
   useEffect(() => {
     const fetchInstrumentNames = async () => {
-      const res = await fetch('/api/raw-data/instruments');
+      const res = await fetch('/api/instruments');
       const names = await res.json();
       setInstrumentNames(names);
     };
