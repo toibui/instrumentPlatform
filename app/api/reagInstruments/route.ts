@@ -7,32 +7,27 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
   const instruments = searchParams.getAll('instrument');
-  const tests = searchParams.getAll('test');
   const page = parseInt(searchParams.get('page') || '1');
   const limit = 50;
   const offset = (page - 1) * limit;
+
   const conditions: string[] = [];
 
   // Thêm điều kiện lọc nếu có instrument
-
   if (instruments.length > 0) {
     const quoted = instruments.map((i) => `'${i}'`).join(', ');
     conditions.push(`"InstrumentName" IN (${quoted})`);
   }
 
- if (tests.length > 0) {
-    const quoted = tests.map((i) => `'${i}'`).join(', ');
-    conditions.push(`"Parametershort" IN (${quoted})`);
-  }
   // WHERE clause cho raw SQL
   const whereSQL = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   // Raw SQL để lấy dữ liệu distinct
   const dataQuery = `
-    SELECT DISTINCT "InstrumentName","Parametershort", "MaterialNumber", "Material Name", "UsageType"
+    SELECT DISTINCT "InstrumentName", "MaterialNumber", "Material Name", "UsageType"
     FROM "raw_data"
     ${whereSQL}
-    ORDER BY "InstrumentName", "Parametershort", "Material Name"
+    ORDER BY "InstrumentName","UsageType", "Material Name"
     LIMIT ${limit}
     OFFSET ${offset};
   `;
@@ -40,7 +35,7 @@ export async function GET(req: Request) {
   // Raw SQL để đếm tổng số dòng distinct
   const countQuery = `
     SELECT COUNT(*) FROM (
-      SELECT DISTINCT "InstrumentName","Parametershort", "MaterialNumber", "Material Name", "UsageType"
+      SELECT DISTINCT "InstrumentName", "MaterialNumber", "Material Name", "UsageType"
       FROM "raw_data"
       ${whereSQL}
     ) AS subquery;
