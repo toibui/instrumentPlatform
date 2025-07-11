@@ -27,7 +27,9 @@ export async function GET(req: Request) {
   const result = await db.execute(sql.raw(query));
 
   // Trích mảng string ra từ kết quả
-  const names = result.map((r: any) => r.InstrumentName).filter((n: any) => typeof n === 'string');
-
+  const names = result
+  .map((r: Record<string, unknown>) => r.InstrumentName)
+  .filter((n): n is string => typeof n === 'string');
+  
   return NextResponse.json(names);
 }

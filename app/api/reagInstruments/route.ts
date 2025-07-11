@@ -5,8 +5,7 @@ import { sql } from 'drizzle-orm';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-
-  const instruments = searchParams.getAll('instrument');
+  
   const page = parseInt(searchParams.get('page') || '1');
   const limit = 50;
   const offset = (page - 1) * limit;
@@ -14,8 +13,10 @@ export async function GET(req: Request) {
   const conditions: string[] = [];
 
   // Thêm điều kiện lọc nếu có instrument
+  const instruments: string[] = searchParams.getAll('instrument'); // khai báo rõ
+
   if (instruments.length > 0) {
-    const quoted = instruments.map((i) => `'${i}'`).join(', ');
+    const quoted = instruments.map((i: string) => `'${i}'`).join(', ');
     conditions.push(`"InstrumentName" IN (${quoted})`);
   }
 
@@ -46,7 +47,18 @@ export async function GET(req: Request) {
   const countResult = await db.execute(sql.raw(countQuery));
 
   // Lấy tổng số từ kết quả
-  const total = Number((countResult as any[])[0]?.count || 0);
+  type CountRow = { count: string };
+
+  let total = 0;
+
+  if (
+    Array.isArray(countResult) &&
+    countResult.length > 0 &&
+    typeof (countResult[0] as Record<string, unknown>).count !== 'undefined'
+  ) {
+    const row = countResult[0] as CountRow;
+    total = Number(row.count);
+  }
 
   return NextResponse.json({ data: dataResult, total });
 }

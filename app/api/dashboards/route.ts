@@ -50,8 +50,10 @@ export async function GET(req: Request) {
   const dataResult = await db.execute(sql.raw(dataQuery));
   const countResult = await db.execute(sql.raw(countQuery));
 
-  // Lấy tổng số từ kết quả
-  const total = Number((countResult as any[])[0]?.count || 0);
+  // Count
+  const total = Array.isArray(countResult) && countResult.length > 0
+  ? Number((countResult[0] as { count: string }).count)
+  : 0;
 
   return NextResponse.json({ data: dataResult, total });
 }

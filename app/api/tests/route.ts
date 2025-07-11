@@ -24,7 +24,9 @@ export async function GET(req: Request) {
 
   const result = await db.execute(sql.raw(query));
 
-  const names = result.map((r: any) => r.Parametershort).filter((n: any) => typeof n === 'string');
+  const names = result
+  .map((r: Record<string, unknown>) => r.Parametershort)
+  .filter((n): n is string => typeof n === 'string');
 
   return NextResponse.json(names);
 }
