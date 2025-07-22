@@ -100,8 +100,16 @@ export default function RawDataTableClient() {
   }, [selectedInstruments, allRelations, allTests]);
 
   // 📦 Xuất Excel
-  const exportToExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(rows);
+  const exportToExcel = async () => {
+    const params = new URLSearchParams();
+    selectedInstruments.forEach((inst) => params.append('instrument', inst));
+    selectedTests.forEach((test) => params.append('test', test));
+    // Không thêm `page`, nghĩa là muốn toàn bộ
+
+    const res = await fetch(`/api/dashboards?${params.toString()}&all=true`);
+    const json = await res.json();
+
+    const worksheet = XLSX.utils.json_to_sheet(json.data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'FilteredData');
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });

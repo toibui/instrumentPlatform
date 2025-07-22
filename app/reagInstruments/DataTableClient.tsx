@@ -49,14 +49,29 @@ export default function RawDataTableClient() {
     fetchInstrumentNames();
   }, []);
 
-  const exportToExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'FilteredData');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const file = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(file, 'filtered_data.xlsx');
+  const exportToExcel = async () => {
+    const params = new URLSearchParams();
+    selectedInstruments.forEach((inst) => params.append('instrument', inst));
+    params.set('all', 'true'); // ⚠️ yêu cầu tất cả dữ liệu, bỏ phân trang
+
+    try {
+      const res = await fetch(`/api/reagInstruments?${params.toString()}`);
+      const json = await res.json();
+
+      const data = Array.isArray(json) ? json : json.data || [];
+
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'FilteredData');
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const file = new Blob([excelBuffer], { type: 'application/octet-stream' });
+      saveAs(file, 'filtered_data.xlsx');
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Export failed. Please try again.');
+    }
   };
+
 
   const instrumentOptions = instrumentNames.map((name) => ({ value: name, label: name }));
   const totalPages = Math.ceil(total / 50);
