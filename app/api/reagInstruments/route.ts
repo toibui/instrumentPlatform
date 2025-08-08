@@ -15,9 +15,16 @@ export async function GET(req: Request) {
   // 🔍 Lọc theo instrument
   const instruments: string[] = searchParams.getAll('instrument');
 
+  // if (instruments.length > 0) {
+  //   const quoted = instruments.map((i: string) => `'${i}'`).join(', ');
+  //   conditions.push(`"InstrumentName" IN (${quoted})`);
+  // }
+
   if (instruments.length > 0) {
-    const quoted = instruments.map((i: string) => `'${i}'`).join(', ');
-    conditions.push(`"InstrumentName" IN (${quoted})`);
+    const likeConditions = instruments
+      .map((i: string) => `"InstrumentName" ILIKE '%${i}%'`)
+      .join(' OR ');
+    conditions.push(`(${likeConditions})`);
   }
 
   // WHERE clause
@@ -25,10 +32,10 @@ export async function GET(req: Request) {
 
   // 🧾 Base SELECT query
   const baseSelect = `
-    SELECT DISTINCT "InstrumentName", "MaterialNumber", "Material Name", "UsageType"
+    SELECT DISTINCT "InstrumentName", "MaterialNumber", "Material_Name", "UsageType"
     FROM "raw_data"
     ${whereSQL}
-    ORDER BY "InstrumentName", "UsageType", "Material Name"
+    ORDER BY "InstrumentName", "UsageType", "Material_Name"
   `;
 
   // 📦 Query dữ liệu

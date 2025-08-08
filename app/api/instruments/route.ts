@@ -8,19 +8,23 @@ export async function GET(req: Request) {
   const tests = searchParams.getAll('test');
   const conditions: string[] = ['"Parametershort" IS NOT NULL'];
 
-  // Thêm điều kiện lọc theo instrument nếu có
+  // Thêm điều kiện lọc theo test (Parametershort) nếu có
   if (tests.length > 0) {
     const quoted = tests.map((i) => `'${i}'`).join(', ');
     conditions.push(`"Parametershort" IN (${quoted})`);
   }
 
-  const whereSQL = `WHERE ${conditions.join(' AND ')}`;
+  // Ghép điều kiện WHERE
+  const whereSQL = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  // Truy vấn raw SQL để lấy danh sách test (Parametershort) duy nhất, sắp xếp ABC
+  // Truy vấn raw SQL để lấy danh sách InstrumentName duy nhất sau khi tách dấu '/'
   const query = `
-    SELECT DISTINCT "InstrumentName"
-    FROM "raw_data"
-    ${whereSQL}
+    SELECT DISTINCT TRIM(value) AS "InstrumentName"
+    FROM (
+      SELECT unnest(string_to_array("InstrumentName", '/')) AS value
+      FROM "raw_data"
+      ${whereSQL}
+    ) AS splitted
     ORDER BY "InstrumentName" ASC;
   `;
 
@@ -28,8 +32,9 @@ export async function GET(req: Request) {
 
   // Trích mảng string ra từ kết quả
   const names = result
-  .map((r: Record<string, unknown>) => r.InstrumentName)
-  .filter((n): n is string => typeof n === 'string');
+    .map((r: Record<string, unknown>) => r.InstrumentName)
+    .filter((n): n is string => typeof n === 'string');
+
   
   return NextResponse.json(names);
 }

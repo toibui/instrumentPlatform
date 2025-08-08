@@ -13,14 +13,18 @@ export async function GET() {
   const result = await db.execute(sql.raw(query));
 
   const relations = result
-  .filter(
-    (r: Record<string, unknown>): r is { InstrumentName: string; Parametershort: string } =>
-      typeof r.InstrumentName === 'string' && typeof r.Parametershort === 'string'
-  )
-  .map(r => ({
-    instrument: r.InstrumentName,
-    test: r.Parametershort,
-  }))
+    .filter(
+      (r: Record<string, unknown>): r is { InstrumentName: string; Parametershort: string } =>
+        typeof r.InstrumentName === 'string' && typeof r.Parametershort === 'string'
+    )
+    .flatMap(r => {
+      // Tách InstrumentName theo dấu "/"
+      const instruments = r.InstrumentName.split('/').map(i => i.trim()).filter(i => i !== '');
+      return instruments.map(inst => ({
+        instrument: inst,
+        test: r.Parametershort,
+      }));
+    });
 
   return NextResponse.json(relations);
 }

@@ -14,10 +14,18 @@ export async function GET(req: Request) {
   const offset = (page - 1) * limit;
   const conditions: string[] = [];
 
-  // Bộ lọc theo instrument
+  // // Bộ lọc theo instrument
+  // if (instruments.length > 0) {
+  //   const quoted = instruments.map((i) => `'${i}'`).join(', ');
+  //   conditions.push(`"InstrumentName" IN (${quoted})`);
+  // }
+
+  // Bộ lọc theo instrument (dùng ILIKE để kiểm tra chứa chuỗi, không phân biệt hoa thường)
   if (instruments.length > 0) {
-    const quoted = instruments.map((i) => `'${i}'`).join(', ');
-    conditions.push(`"InstrumentName" IN (${quoted})`);
+    const ilikeConditions = instruments
+      .map((i) => `"InstrumentName" ILIKE '%${i}%'`)
+      .join(' OR ');
+    conditions.push(`(${ilikeConditions})`);
   }
 
   // Bộ lọc theo test
@@ -31,10 +39,10 @@ export async function GET(req: Request) {
 
   // Raw SQL truy vấn dữ liệu
   const baseSelect = `
-    SELECT DISTINCT "InstrumentName", "Parametershort", "MaterialNumber", "Material Name", "UsageType"
+    SELECT DISTINCT "InstrumentName", "PL6", "MaterialNumber", "Material_Name", "Parametershort"
     FROM "raw_data"
     ${whereSQL}
-    ORDER BY "InstrumentName", "Parametershort", "Material Name"
+    ORDER BY "InstrumentName", "PL6", "Material_Name"
   `;
 
   const dataQuery = isExportAll
