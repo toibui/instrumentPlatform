@@ -1,23 +1,28 @@
 // app/api/raw-data/instruments/route.ts
 import { NextResponse } from 'next/server';
-import { db } from '../../../lib/db';
+import { db } from '../../../lib/db'; // hoặc '@/lib/db'
 import { sql } from 'drizzle-orm';
+
+type Group = 'Hóa sinh' | 'Miễn dịch' | 'Điện giải';
+
+// Định nghĩa kiểu dữ liệu cho từng row
+interface InstrumentRow extends Record<string, unknown> {
+  InstrumentName: string;
+}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const tests = searchParams.getAll('test');
   const conditions: string[] = ['"Parametershort" IS NOT NULL'];
 
-  // Thêm điều kiện lọc theo test (Parametershort) nếu có
   if (tests.length > 0) {
     const quoted = tests.map((i) => `'${i}'`).join(', ');
     conditions.push(`"Parametershort" IN (${quoted})`);
   }
 
-  // Ghép điều kiện WHERE
-  const whereSQL = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const whereSQL =
+    conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  // Truy vấn raw SQL để lấy danh sách InstrumentName duy nhất sau khi tách dấu '/'
   const query = `
     SELECT DISTINCT TRIM(value) AS "InstrumentName"
     FROM (
@@ -28,13 +33,38 @@ export async function GET(req: Request) {
     ORDER BY "InstrumentName" ASC;
   `;
 
-  const result = await db.execute(sql.raw(query));
+  // Khai báo kiểu dữ liệu trả về
+  const execResult = await db.execute<InstrumentRow>(sql.raw(query));
 
-  // Trích mảng string ra từ kết quả
-  const names = result
-    .map((r: Record<string, unknown>) => r.InstrumentName)
-    .filter((n): n is string => typeof n === 'string');
+  // Đảm bảo rows là mảng đúng kiểu
+  const rows: InstrumentRow[] = Array.isArray(execResult)
+    ? execResult
+    : Array.isArray((execResult as { rows: InstrumentRow[] })?.rows)
+    ? (execResult as { rows: InstrumentRow[] }).rows
+    : [];
 
-  
-  return NextResponse.json(names);
+  const instrumentGroups: Record<string, Group> = {
+    'Cobas c311': 'Hóa sinh',
+    'Cobas c501': 'Hóa sinh',
+    'Cobas c502': 'Hóa sinh',
+    'Cobas c701': 'Hóa sinh',
+    'Cobas c702': 'Hóa sinh',
+    'Cobas c303': 'Hóa sinh',
+    'Cobas c503': 'Hóa sinh',
+    'Cobas c703': 'Hóa sinh',
+    'Cobas c513': 'Hóa sinh',
+    'Cobas e411': 'Miễn dịch',
+    'Cobas e402': 'Miễn dịch',
+    'Cobas e601': 'Miễn dịch',
+    'Cobas e602': 'Miễn dịch',
+    'Cobas e801': 'Miễn dịch',
+    'ISE1800': 'Điện giải',
+  };
+
+  const namesWithGroup = rows.map((r) => ({
+    name: r.InstrumentName.trim(),
+    group: instrumentGroups[r.InstrumentName.trim()] ?? null,
+  }));
+
+  return NextResponse.json(namesWithGroup);
 }

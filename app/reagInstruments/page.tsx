@@ -10,7 +10,7 @@ const RawDataTableClient = dynamic(() => import('./DataTableClient'), {
 export default function RawDataPage() {
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Reagent list by instrument</h1>
+      <h1 className="text-2xl font-bold mb-4">Hóa chất theo máy</h1>
       <RawDataTableClient />
     </div>
   );

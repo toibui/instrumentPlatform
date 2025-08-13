@@ -7,6 +7,7 @@ export async function GET(req: Request) {
 
   const instruments = searchParams.getAll('instrument');
   const tests = searchParams.getAll('test');
+  const types = searchParams.getAll('typeofprod');
   const page = parseInt(searchParams.get('page') || '1');
   const isExportAll = searchParams.get('all') === 'true';
 
@@ -34,12 +35,19 @@ export async function GET(req: Request) {
     conditions.push(`"Parametershort" IN (${quoted})`);
   }
 
+    // Bộ lọc theo type
+  if (types.length > 0) {
+    const quoted = types.map((t) => `'${t}'`).join(', ');
+    conditions.push(`"UsageType" IN (${quoted})`);
+  }
+
+
   // WHERE clause
   const whereSQL = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   // Raw SQL truy vấn dữ liệu
   const baseSelect = `
-    SELECT DISTINCT "InstrumentName", "PL6", "MaterialNumber", "Material_Name", "Parametershort"
+    SELECT DISTINCT "InstrumentName", "PL6", "MaterialNumber", "Material_Name", "Parametershort","UsageType"
     FROM "raw_data"
     ${whereSQL}
     ORDER BY "InstrumentName", "PL6", "Material_Name"

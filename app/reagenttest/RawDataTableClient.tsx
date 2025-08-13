@@ -11,13 +11,25 @@ interface RawData {
   [key: string]: string | number | null;
 }
 
+interface Relation {
+  instrument: string;
+  test: string;
+  group: 'Miễn dịch' | 'Hóa sinh' | 'Điện giải';
+}
+
 export default function RawDataTableClient() {
-  const [allRelations, setAllRelations] = useState<{ instrument: string; test: string }[]>([]);
-  const [allInstruments, setAllInstruments] = useState<string[]>([]);
-  const [allTests, setAllTests] = useState<string[]>([]);
+  const [allRelations, setAllRelations] = useState<Relation[]>([]);
+  const [instrumentGroups, setInstrumentGroups] = useState<Record<string, string[]>>({
+    'Miễn dịch': [],
+    'Hóa sinh': [],
+    'Điện giải': [],
+  });
+
+  const [productTypes, setProductTypes] = useState<string[]>([]);
 
   const [selectedInstruments, setSelectedInstruments] = useState<string[]>([]);
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
+  const [selectedProductTypes, setSelectedProductTypes] = useState<string[]>([]);
 
   const [instrumentNames, setInstrumentNames] = useState<string[]>([]);
   const [testNames, setTestNames] = useState<string[]>([]);
@@ -30,51 +42,72 @@ export default function RawDataTableClient() {
   const limit = 50;
   const totalPages = Math.ceil(total / limit);
 
-  // 🟢 Fetch bảng dữ liệu
+  // Fetch dữ liệu bảng
   const fetchData = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     selectedInstruments.forEach((inst) => params.append('instrument', inst));
     selectedTests.forEach((test) => params.append('test', test));
+    selectedProductTypes.forEach((prod) => params.append('typeofprod', prod));
     params.set('page', page.toString());
 
-    const res = await fetch(`/api/dashboards?${params.toString()}`);
+    const res = await fetch(`/api/reagenttest?${params.toString()}`);
     const json = await res.json();
 
     setRows(json.data);
     setTotal(json.total);
     setLoading(false);
-  }, [selectedInstruments, selectedTests, page]);
+  }, [selectedInstruments, selectedTests, selectedProductTypes, page]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // 🔁 Lấy quan hệ 1 lần
+  // Lấy quan hệ và nhóm máy
   useEffect(() => {
     const fetchRelations = async () => {
       const res = await fetch('/api/relations');
-      const data = (await res.json()) as { instrument: string; test: string }[];
+      const data = (await res.json()) as Relation[];
 
       setAllRelations(data);
 
-      const uniqueInstruments = Array.from(new Set(data.map((r) => r.instrument))).sort();
-      const uniqueTests = Array.from(new Set(data.map((r) => r.test))).sort();
+      const grouped: Record<string, string[]> = {
+        'Miễn dịch': [],
+        'Hóa sinh': [],
+        'Điện giải': [],
+      };
+      data.forEach((r) => {
+        if (grouped[r.group] && !grouped[r.group].includes(r.instrument)) {
+          grouped[r.group].push(r.instrument);
+        }
+      });
 
-      setAllInstruments(uniqueInstruments);
-      setAllTests(uniqueTests);
-      setInstrumentNames(uniqueInstruments);
-      setTestNames(uniqueTests);
+      setInstrumentGroups(grouped);
+
+      const allInstruments = Array.from(new Set(data.map((r) => r.instrument))).sort();
+      const allTests = Array.from(new Set(data.map((r) => r.test))).sort();
+
+      setInstrumentNames(allInstruments);
+      setTestNames(allTests);
     };
 
     fetchRelations();
   }, []);
 
+  // Lấy danh sách loại sản phẩm
+  useEffect(() => {
+    const fetchProductTypes = async () => {
+      const res = await fetch('/api/typeofprod');
+      const types: string[] = await res.json();
+      setProductTypes(types);
+    };
+    fetchProductTypes();
+  }, []);
 
-  // 🔁 Khi chọn Test → lọc Instrument
+  // Khi chọn Test → lọc Instrument
   useEffect(() => {
     if (selectedTests.length === 0) {
-      setInstrumentNames(allInstruments);
+      setInstrumentNames(Object.values(instrumentGroups).flat());
       return;
     }
 
@@ -83,12 +116,12 @@ export default function RawDataTableClient() {
       .map((r) => r.instrument);
 
     setInstrumentNames(Array.from(new Set(instrumentsFiltered)).sort());
-  }, [selectedTests, allRelations, allInstruments]);
+  }, [selectedTests, allRelations, instrumentGroups]);
 
-  // 🔁 Khi chọn Instrument → lọc Test
+  // Khi chọn Instrument → lọc Test
   useEffect(() => {
     if (selectedInstruments.length === 0) {
-      setTestNames(allTests);
+      setTestNames(Array.from(new Set(allRelations.map((r) => r.test))).sort());
       return;
     }
 
@@ -97,16 +130,16 @@ export default function RawDataTableClient() {
       .map((r) => r.test);
 
     setTestNames(Array.from(new Set(testsFiltered)).sort());
-  }, [selectedInstruments, allRelations, allTests]);
+  }, [selectedInstruments, allRelations]);
 
-  // 📦 Xuất Excel
+  // Xuất Excel
   const exportToExcel = async () => {
     const params = new URLSearchParams();
     selectedInstruments.forEach((inst) => params.append('instrument', inst));
     selectedTests.forEach((test) => params.append('test', test));
-    // Không thêm `page`, nghĩa là muốn toàn bộ
+    selectedProductTypes.forEach((prod) => params.append('typeofprod', prod));
 
-    const res = await fetch(`/api/dashboards?${params.toString()}&all=true`);
+    const res = await fetch(`/api/reagenttest?${params.toString()}&all=true`);
     const json = await res.json();
 
     const worksheet = XLSX.utils.json_to_sheet(json.data);
@@ -117,45 +150,54 @@ export default function RawDataTableClient() {
     saveAs(file, 'filtered_data.xlsx');
   };
 
-  // 🧩 UI Options
-  const instrumentOptions = instrumentNames.map((name) => ({ value: name, label: name }));
+  // UI
   const testOptions = testNames.map((name) => ({ value: name, label: name }));
+  const productTypeOptions = productTypes.map((t) => ({ value: t, label: t }));
 
-  // 🎛️ Chiều rộng cột tuỳ chỉnh
   const columnWidths: Record<string, string> = {
     InstrumentName: 'w-[100px]',
     Parametershort: 'w-[30px]',
     MaterialNumber: 'w-[100px]',
-    "Material Name": 'w-[200px]',
+    'Material Name': 'w-[200px]',
     UsageType: 'w-[100px]',
   };
 
   return (
     <div>
-      {/* 🔍 Bộ lọc */}
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-        {/* 🎛️ Instrument */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">🎛️ Instrument Name</label>
-          <Select
-            isMulti
-            options={instrumentOptions}
-            value={instrumentOptions.filter((opt) => selectedInstruments.includes(opt.value))}
-            onChange={(selectedOptions) => {
-              setPage(1);
-              setSelectedInstruments(selectedOptions.map(opt => opt.value));
-              // ❗️Nếu bạn KHÔNG muốn reset test khi đổi instrument thì xóa dòng này
-              setSelectedTests([]);
-            }}
-            placeholder="Select instruments..."
-            className="text-sm"
-            classNamePrefix="react-select"
-            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-            styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-          />
-        </div>
+      {/* Filter */}
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+        {/* Instrument theo nhóm có filter theo instrumentNames */}
+        {Object.entries(instrumentGroups).map(([groupName, instruments]) => {
+          const filteredInstruments = instruments.filter((name) =>
+            instrumentNames.includes(name)
+          );
 
-        {/* 🧪 Test */}
+          return (
+            <div key={groupName}>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">{groupName}</label>
+              <Select
+                isMulti
+                options={filteredInstruments.map((name) => ({ value: name, label: name }))}
+                value={filteredInstruments
+                  .filter((name) => selectedInstruments.includes(name))
+                  .map((name) => ({ value: name, label: name }))}
+                onChange={(selectedOptions) =>
+                  setSelectedInstruments((prev) => {
+                    const others = prev.filter((p) => !instruments.includes(p));
+                    return [...others, ...selectedOptions.map((opt) => opt.value)];
+                  })
+                }
+                placeholder={`Select ${groupName}...`}
+                className="text-sm"
+                classNamePrefix="react-select"
+                menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+              />
+            </div>
+          );
+        })}
+
+        {/* Filter Test */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">🧪 Test Name</label>
           <Select
@@ -164,28 +206,44 @@ export default function RawDataTableClient() {
             value={testOptions.filter((opt) => selectedTests.includes(opt.value))}
             onChange={(selectedOptions) => {
               setPage(1);
-              setSelectedTests(selectedOptions.map(opt => opt.value));
+              setSelectedTests(selectedOptions.map((opt) => opt.value));
             }}
             placeholder="Select tests..."
             className="text-sm"
             classNamePrefix="react-select"
             menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-            styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+            styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
           />
         </div>
 
-        {/* 📥 Excel */}
+        {/* Filter loại sản phẩm */}
         <div>
-          <button
-            onClick={exportToExcel}
-            className="w-full flex items-center justify-center gap-2 bg-green-600 text-white font-semibold px-4 py-2 rounded-xl shadow hover:bg-green-700 transition"
-          >
-            📥 Download Excel
-          </button>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">📦 Loại sản phẩm</label>
+          <Select
+            isMulti
+            options={productTypeOptions}
+            value={productTypeOptions.filter((opt) => selectedProductTypes.includes(opt.value))}
+            onChange={(selectedOptions) => setSelectedProductTypes(selectedOptions.map((opt) => opt.value))}
+            placeholder="Select product types..."
+            className="text-sm"
+            classNamePrefix="react-select"
+            menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+            styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+          />
         </div>
       </div>
 
-      {/* 🧾 Bảng dữ liệu */}
+      {/* Nút Download Excel */}
+      <div className="flex justify-start mb-4">
+        <button
+          onClick={exportToExcel}
+          className="flex items-center justify-center gap-2 bg-green-600 text-white font-semibold px-4 py-2 rounded-xl shadow hover:bg-green-700 transition"
+        >
+          📥 Download Excel
+        </button>
+      </div>
+
+      {/* Bảng */}
       {loading ? (
         <p>🔄 Loading...</p>
       ) : (
@@ -216,7 +274,7 @@ export default function RawDataTableClient() {
             </table>
           </div>
 
-          {/* 🔁 Phân trang */}
+          {/* Phân trang */}
           <div className="flex justify-between items-center mt-4">
             <p>
               Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
