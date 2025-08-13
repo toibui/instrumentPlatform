@@ -14,6 +14,7 @@ export async function GET(req: Request) {
 
   // 🔍 Lọc theo instrument
   const instruments: string[] = searchParams.getAll('instrument');
+  const types = searchParams.getAll('typeofprod');
 
   // if (instruments.length > 0) {
   //   const quoted = instruments.map((i: string) => `'${i}'`).join(', ');
@@ -25,6 +26,11 @@ export async function GET(req: Request) {
       .map((i: string) => `"InstrumentName" ILIKE '%${i}%'`)
       .join(' OR ');
     conditions.push(`(${likeConditions})`);
+  }
+      // Bộ lọc theo type
+  if (types.length > 0) {
+    const quoted = types.map((t) => `'${t}'`).join(', ');
+    conditions.push(`"UsageType" IN (${quoted})`);
   }
 
   // WHERE clause
