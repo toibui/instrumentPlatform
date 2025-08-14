@@ -7,4 +7,6 @@ export const rawData = pgTable('raw_data', {
   Parametershort: varchar('Parametershort', { length: 255 }),
   UsageType: varchar('UsageType', { length: 255 }),
   PL6: varchar('PL6', { length: 255 }),
+  PM: varchar('PM phụ trách', { length: 255 }),
+  Boxsize: varchar('Quy cách_Hộp', { length: 255 }),
 });

@@ -38,10 +38,10 @@ export async function GET(req: Request) {
 
   // 🧾 Base SELECT query
   const baseSelect = `
-    SELECT DISTINCT "InstrumentName", "MaterialNumber", "Material_Name", "UsageType"
+    SELECT DISTINCT "PM phụ trách", "MaterialNumber", "Material_Name", "UsageType","Quy cách_Hộp"
     FROM "raw_data"
     ${whereSQL}
-    ORDER BY "InstrumentName", "UsageType", "Material_Name"
+    ORDER BY  "UsageType", "Material_Name"
   `;
 
   // 📦 Query dữ liệu
