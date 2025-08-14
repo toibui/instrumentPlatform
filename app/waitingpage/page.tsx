@@ -7,7 +7,7 @@ export default function WaitingPage() {
           🚧 Dự Án Đang Nâng Cấp
         </h1>
         <p className="text-gray-600 mb-6">
-          Chúng tôi đang bảo trì và nâng cấp hệ thống để phục vụ bạn tốt hơn.
+          Chúng tôi đang phát triển tính năng mới này để mang lại trải nghiệm tốt hơn cho bạn
           Vui lòng quay lại sau.
         </p>
         <div className="animate-spin h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
