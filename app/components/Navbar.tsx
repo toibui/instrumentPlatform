@@ -10,8 +10,8 @@ export default function Navbar() {
   const menuItems = [
     { href: '/reagInstruments', label: 'Hóa chất theo máy' },
     { href: '/reagenttest', label: 'Hóa chất theo xét nghiệm' },
-    { href: '/reagenttest', label: 'Hóa chất chuyển đổi AMS, Biotin, FLIRT, ESPS' },
-    { href: '/reagInstruments', label: 'Chuyển đổi danh mục' }
+    { href: '/waitingpage', label: 'Hóa chất chuyển đổi AMS, Biotin, FLIRT, ESPS' },
+    { href: '/waitingpage', label: 'Chuyển đổi danh mục' }
   ];
 
   return (
