@@ -58,7 +58,9 @@ export async function GET(req: Request) {
     'Cobas e601': 'Miễn dịch',
     'Cobas e602': 'Miễn dịch',
     'Cobas e801': 'Miễn dịch',
-    'ISE1800': 'Điện giải',
+    'pro ISE': 'Điện giải',
+    'ISeModule': 'Điện giải',
+    'ISE neo': 'Điện giải',
   };
 
   const namesWithGroup = rows.map((r) => ({
