@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '../../../lib/db';
 import { sql } from 'drizzle-orm';
+import {instrumentGroups} from '../../../utils/instrumentGroups';
 
 export async function GET() {
   const query = `
@@ -11,28 +12,6 @@ export async function GET() {
   `;
 
   const result = await db.execute(sql.raw(query));
-
-  // 🗂️ Mapping nhóm xét nghiệm
-  const groupMapping: Record<string, string> = {
-    // Có thể map theo instrument hoặc test
-    // Key viết in hoa để tránh phân biệt hoa thường
-    'Cobas c311': 'Hóa sinh',
-    'Cobas c501': 'Hóa sinh',
-    'Cobas c502': 'Hóa sinh',
-    'Cobas c701': 'Hóa sinh',
-    'Cobas c702': 'Hóa sinh',
-    'Cobas c303': 'Hóa sinh',
-    'Cobas c503': 'Hóa sinh',
-    'Cobas c703': 'Hóa sinh',
-    'Cobas c513': 'Hóa sinh',
-    'Cobas e411': 'Miễn dịch',
-    'Cobas e402': 'Miễn dịch',
-    'Cobas e601': 'Miễn dịch',
-    'Cobas e602': 'Miễn dịch',
-    'Cobas e801': 'Miễn dịch',
-    // ... thêm các loại khác
-  };
-
   const relations = result
     .filter(
       (r: Record<string, unknown>): r is { InstrumentName: string; Parametershort: string } =>
@@ -47,7 +26,7 @@ export async function GET() {
       return instruments.map(inst => ({
         instrument: inst,
         test: r.Parametershort,
-        group: groupMapping[inst] || 'Khác', // Nếu không map thì để "Khác"
+        group: instrumentGroups[inst] || 'Khác', // Nếu không map thì để "Khác"
       }));
     });
 

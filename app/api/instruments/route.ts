@@ -2,8 +2,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '../../../lib/db'; // hoặc '@/lib/db'
 import { sql } from 'drizzle-orm';
+import {instrumentGroups} from '../../../utils/instrumentGroups';
 
-type Group = 'Hóa sinh' | 'Miễn dịch' | 'Điện giải';
+// type Group = 'Hóa sinh' | 'Miễn dịch' | 'Điện giải';
 
 // Định nghĩa kiểu dữ liệu cho từng row
 interface InstrumentRow extends Record<string, unknown> {
@@ -42,26 +43,6 @@ export async function GET(req: Request) {
     : Array.isArray((execResult as { rows: InstrumentRow[] })?.rows)
     ? (execResult as { rows: InstrumentRow[] }).rows
     : [];
-
-  const instrumentGroups: Record<string, Group> = {
-    'Cobas c311': 'Hóa sinh',
-    'Cobas c501': 'Hóa sinh',
-    'Cobas c502': 'Hóa sinh',
-    'Cobas c701': 'Hóa sinh',
-    'Cobas c702': 'Hóa sinh',
-    'Cobas c303': 'Hóa sinh',
-    'Cobas c503': 'Hóa sinh',
-    'Cobas c703': 'Hóa sinh',
-    'Cobas c513': 'Hóa sinh',
-    'Cobas e411': 'Miễn dịch',
-    'Cobas e402': 'Miễn dịch',
-    'Cobas e601': 'Miễn dịch',
-    'Cobas e602': 'Miễn dịch',
-    'Cobas e801': 'Miễn dịch',
-    'pro ISE': 'Điện giải',
-    'ISeModule': 'Điện giải',
-    'ISE neo': 'Điện giải',
-  };
 
   const namesWithGroup = rows.map((r) => ({
     name: r.InstrumentName.trim(),

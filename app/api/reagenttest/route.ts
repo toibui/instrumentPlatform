@@ -15,13 +15,7 @@ export async function GET(req: Request) {
   const offset = (page - 1) * limit;
   const conditions: string[] = [];
 
-  // // Bộ lọc theo instrument
-  // if (instruments.length > 0) {
-  //   const quoted = instruments.map((i) => `'${i}'`).join(', ');
-  //   conditions.push(`"InstrumentName" IN (${quoted})`);
-  // }
-
-  // Bộ lọc theo instrument (dùng ILIKE để kiểm tra chứa chuỗi, không phân biệt hoa thường)
+  // Bộ lọc theo instrument
   if (instruments.length > 0) {
     const ilikeConditions = instruments
       .map((i) => `"InstrumentName" ILIKE '%${i}%'`)
@@ -32,32 +26,43 @@ export async function GET(req: Request) {
   // Bộ lọc theo test
   if (tests.length > 0) {
     const quoted = tests.map((t) => `'${t}'`).join(', ');
-    conditions.push(`"Parametershort" IN (${quoted})`);
+    if (instruments.length > 0) {
+      // Nếu có cả instrument và test → test IN list hoặc rỗng
+      conditions.push(`("Parametershort" IN (${quoted}) OR "Parametershort" = '')`);
+    } else {
+      conditions.push(`"Parametershort" IN (${quoted})`);
+    }
   }
 
-    // Bộ lọc theo type
+  // Bộ lọc theo type
   if (types.length > 0) {
     const quoted = types.map((t) => `'${t}'`).join(', ');
     conditions.push(`"UsageType" IN (${quoted})`);
   }
-
 
   // WHERE clause
   const whereSQL = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   // Raw SQL truy vấn dữ liệu
   const baseSelect = `
-    SELECT DISTINCT "InstrumentName", "PL6", "MaterialNumber", "Material_Name", "Parametershort","UsageType"
-    FROM "raw_data"
-    ${whereSQL}
-    ORDER BY "InstrumentName", "PL6", "Material_Name"
-  `;
+  SELECT
+    "PL6",
+    "MaterialNumber",
+    "Material_Name",
+    "UsageType" AS "Nhóm sản phẩm",
+    STRING_AGG(DISTINCT "InstrumentName", ', ') AS "InstrumentName",
+    STRING_AGG(DISTINCT "Parametershort", ', ') AS "Nhóm xét nghiệm"
+
+  FROM "raw_data"
+  ${whereSQL}
+  GROUP BY "PL6", "MaterialNumber", "Material_Name", "UsageType"
+  ORDER BY "UsageType", "PL6"
+`;
 
   const dataQuery = isExportAll
     ? baseSelect
     : `${baseSelect} LIMIT ${limit} OFFSET ${offset};`;
 
-  // Truy vấn tổng số dòng (chỉ cần nếu không export all)
   const countQuery = `
     SELECT COUNT(*) FROM (
       ${baseSelect}
