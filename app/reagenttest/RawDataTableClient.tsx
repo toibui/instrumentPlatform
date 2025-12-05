@@ -140,15 +140,33 @@ export default function RawDataTableClient() {
     selectedProductTypes.forEach((prod) => params.append('typeofprod', prod));
 
     const res = await fetch(`/api/reagenttest?${params.toString()}&all=true`);
-    const json = await res.json();
+    const json = (await res.json()) as { data: RawData[]; total: number };
 
-    const worksheet = XLSX.utils.json_to_sheet(json.data);
+    if (!json.data || json.data.length === 0) return;
+
+    // Lấy các cột đang hiển thị trên UI
+    const visibleColumns = Object.keys(rows[0] ?? {});
+
+    // Chỉ giữ các cột này
+    const filteredData: RawData[] = json.data.map((row) => {
+    const filteredRow: RawData = {
+      InstrumentName: row.InstrumentName ?? null,
+      Test: row.Test ?? null,
+    };
+      visibleColumns.forEach((col) => {
+        filteredRow[col] = row[col] ?? null;
+      });
+      return filteredRow;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(filteredData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'FilteredData');
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const file = new Blob([excelBuffer], { type: 'application/octet-stream' });
     saveAs(file, 'filtered_data.xlsx');
   };
+
 
   // UI
   const testOptions = testNames.map((name) => ({ value: name, label: name }));
