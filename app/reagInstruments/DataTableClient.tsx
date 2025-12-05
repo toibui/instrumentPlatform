@@ -82,29 +82,35 @@ export default function RawDataTableClient() {
     fetchProductTypes();
   }, []);
 
-  const exportToExcel = async () => {
-    const params = new URLSearchParams();
-    selectedInstruments.forEach((inst) => params.append('instrument', inst));
-    selectedProductTypes.forEach((prod) => params.append('typeofprod', prod));
-    params.set('all', 'true');
-
-    try {
-      const res = await fetch(`/api/reagInstruments?${params.toString()}`);
-      const json = await res.json();
-
-      const data = Array.isArray(json) ? json : json.data || [];
-
-      const worksheet = XLSX.utils.json_to_sheet(data);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'FilteredData');
-      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      const file = new Blob([excelBuffer], { type: 'application/octet-stream' });
-      saveAs(file, 'filtered_data.xlsx');
-    } catch (error) {
-      console.error('Export failed:', error);
-      alert('Export failed. Please try again.');
+  const exportToExcel = () => {
+    if (rows.length === 0) {
+      alert('No data to export');
+      return;
     }
+
+    // Lấy cột hiện tại hiển thị trên UI
+    const visibleColumns = Object.keys(rows[0]);
+
+    // Chỉ giữ các cột này
+    const filteredData = rows.map((row) => {
+      const filteredRow: RawData = { InstrumentName: row.InstrumentName ?? null };
+      visibleColumns.forEach((col) => {
+        if (col !== 'InstrumentName') {
+          filteredRow[col] = row[col] ?? null;
+        }
+      });
+      return filteredRow;
+    });
+
+    // Tạo Excel
+    const worksheet = XLSX.utils.json_to_sheet(filteredData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'FilteredData');
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const file = new Blob([excelBuffer], { type: 'application/octet-stream' });
+    saveAs(file, 'filtered_data.xlsx');
   };
+
   
   const totalPages = Math.ceil(total / 50);
 
