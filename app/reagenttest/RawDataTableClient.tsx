@@ -131,81 +131,44 @@ export default function RawDataTableClient() {
     setTestNames(Array.from(new Set(testsFiltered)).sort());
   }, [selectedInstruments, allRelations]);
 
-  // ====== processedRows: UI + Excel dùng chung ======
+  interface RawData {
+    InstrumentName: string | null;
+    Test: string | null;
+    MaterialNumber?: string | null;
+    Material_Name?: string | null;
+    PL6?: string | null;
+    ['Nhóm xét nghiệm']?: string | null | string[];
+    ['Nhóm sản phẩm']?: string | null;
+    [key: string]: any;
+  }
+
+  // Nếu muốn chuẩn bị type cho xuất Excel, bạn vẫn có thể giữ
+  type ProcessedRow = RawData & {
+    nhomXetNghiem?: string | null;
+    nhomSanPham?: string | number | null;
+  };
+
+  // Trong UI, giữ nguyên dữ liệu
   const processedRows: RawData[] = useMemo(() => {
     if (!rows || rows.length === 0) return [];
-
-    // 1. EXPLODE Nhóm xét nghiệm
-    const explodedData: RawData[] = rows.flatMap((item): RawData[] => {
-      const rawTests = item['Nhóm xét nghiệm'];
-      const nhomSanPham = item['Nhóm sản phẩm'] ?? null;
-
-      if (typeof rawTests !== 'string') {
-        return [{
-          nhomXetNghiem: rawTests != null ? String(rawTests) : null,
-          nhomSanPham,
-          InstrumentName: item.InstrumentName ?? null,
-          Test: item.Test ?? null,
-        }];
-      }
-
-      return rawTests.split(',').map((test) => ({
-        nhomXetNghiem: test.trim(),
-        nhomSanPham,
-        InstrumentName: item.InstrumentName ?? null,
-        Test: item.Test ?? null,
-      }));
-    });
-
-    // 2. PRIORITY MAP
-    const priorityMap: Record<string, number> = {
-      'Hóa chất': 0,
-      'Chất chuẩn (QC)': 1,
-      'Chất hiệu chuẩn (Cal)': 2,
-      'Phụ trợ': 3,
-    };
-
-    // 3. SORT
-    explodedData.sort((a, b) => {
-      const testA = a.nhomXetNghiem ?? '';
-      const testB = b.nhomXetNghiem ?? '';
-
-      if (testA < testB) return -1;
-      if (testA > testB) return 1;
-
-      const priA = priorityMap[a.nhomSanPham ?? ''] ?? 99;
-      const priB = priorityMap[b.nhomSanPham ?? ''] ?? 99;
-
-      return priA - priB;
-    });
-
-    // 4. GIỮ CỘT HIỂN THỊ
-    const visibleColumns = Object.keys(rows[0] ?? {});
-    return explodedData.map((row) => {
-      const filteredRow: RawData = {
-        InstrumentName: row.InstrumentName ?? null,
-        Test: row.Test ?? null,
-      };
-      visibleColumns.forEach((col) => {
-        filteredRow[col] = row[col] ?? null;
-      });
-      return filteredRow;
-    });
+    return rows; // trả về nguyên bản, không thay đổi gì
   }, [rows]);
 
   // ====== Export Excel ======
-  const exportToExcel = () => {
-    if (!processedRows || processedRows.length === 0) return;
+  function exportExcel(rows: RawData[]) {
+    if (!rows || rows.length === 0) return;
 
-    const worksheet = XLSX.utils.json_to_sheet(processedRows);
+    // Chỉ chuyển nguyên rows sang worksheet, không xử lý gì
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+
+    // Tạo workbook và append sheet
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'FilteredData');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
 
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const file = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(file, 'filtered_data.xlsx');
-  };
-
+    // Xuất file
+    XLSX.writeFile(workbook, 'export.xlsx');
+  }
+  
   // ====== UI Options ======
   const testOptions = testNames.map((name) => ({ value: name, label: name }));
   const productTypeOptions = productTypes.map((t) => ({ value: t, label: t }));
@@ -291,7 +254,7 @@ export default function RawDataTableClient() {
       {/* Download Excel */}
       <div className="flex justify-start mb-4">
         <button
-          onClick={exportToExcel}
+          onClick={() => exportExcel(processedRows)}
           className="flex items-center justify-center gap-2 bg-green-600 text-white font-semibold px-4 py-2 rounded-xl shadow hover:bg-green-700 transition"
         >
           📥 Download Excel

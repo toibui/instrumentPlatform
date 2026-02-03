@@ -51,13 +51,21 @@ export async function GET(req: Request) {
     "Material_Name",
     "UsageType" AS "Nhóm sản phẩm",
     STRING_AGG(DISTINCT "InstrumentName", ', ') AS "InstrumentName",
-    STRING_AGG(DISTINCT "Parametershort", ', ') AS "Nhóm xét nghiệm"
-
+    "Parametershort" AS "Nhóm xét nghiệm"
   FROM "raw_data"
   ${whereSQL}
-  GROUP BY "PL6", "MaterialNumber", "Material_Name", "UsageType"
-  ORDER BY "UsageType", "PL6"
-`;
+  GROUP BY "PL6", "MaterialNumber", "Material_Name", "UsageType", "Parametershort"
+  ORDER BY
+    "Parametershort",  -- xếp alphabet
+    CASE "UsageType"
+      WHEN 'Hóa chất' THEN 0
+      WHEN 'Chất chuẩn (QC)' THEN 1
+      WHEN 'Chất hiệu chuẩn (Cal)' THEN 2
+      WHEN 'Phụ trợ' THEN 3
+      ELSE 99
+    END,
+    "PL6"
+  `; // ❌ KHÔNG dấu ; ở cuối
 
   const dataQuery = isExportAll
     ? baseSelect
