@@ -56,7 +56,8 @@ export async function GET(req: Request) {
   ${whereSQL}
   GROUP BY "PL6", "MaterialNumber", "Material_Name", "UsageType", "Parametershort"
   ORDER BY
-    "Parametershort",  -- xếp alphabet
+    "InstrumentName" ASC,
+    NULLIF(TRIM("Parametershort"), '') ASC NULLS LAST,
     CASE "UsageType"
       WHEN 'Hóa chất' THEN 0
       WHEN 'Chất chuẩn (QC)' THEN 1
