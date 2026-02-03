@@ -132,40 +132,110 @@ export default function RawDataTableClient() {
     setTestNames(Array.from(new Set(testsFiltered)).sort());
   }, [selectedInstruments, allRelations]);
 
-  // Xuất Excel
   const exportToExcel = async () => {
-    const params = new URLSearchParams();
-    selectedInstruments.forEach((inst) => params.append('instrument', inst));
-    selectedTests.forEach((test) => params.append('test', test));
-    selectedProductTypes.forEach((prod) => params.append('typeofprod', prod));
+  const params = new URLSearchParams();
+  selectedInstruments.forEach((inst) => params.append('instrument', inst));
+  selectedTests.forEach((test) => params.append('test', test));
+  selectedProductTypes.forEach((prod) => params.append('typeofprod', prod));
 
-    const res = await fetch(`/api/reagenttest?${params.toString()}&all=true`);
-    const json = (await res.json()) as { data: RawData[]; total: number };
+  const res = await fetch(`/api/reagenttest?${params.toString()}&all=true`);
+  const json = (await res.json()) as { data: RawData[]; total: number };
 
-    if (!json.data || json.data.length === 0) return;
+  if (!json.data || json.data.length === 0) return;
 
-    // Lấy các cột đang hiển thị trên UI
+  // ===============================
+  // 1. EXPLODE Nhóm xét nghiệm
+  // ===============================
+    let explodedData: RawData[] = [];
+
+    json.data.forEach((item) => {
+      const rawTests = item['Nhóm xét nghiệm'];
+      const nhomSanPham = item['Nhóm sản phẩm'] ?? null;
+
+      // Không phải string → giữ nguyên
+      if (typeof rawTests !== 'string') {
+        explodedData.push({
+          ...item,
+          nhomXetNghiem: rawTests ?? null,
+          nhomSanPham,
+        });
+        return;
+      }
+
+      // Split + explode
+      rawTests.split(',').forEach((test) => {
+        explodedData.push({
+          ...item,
+          nhomXetNghiem: test.trim(),
+          nhomSanPham,
+        });
+      });
+    });
+
+    // ===============================
+    // 2. PRIORITY MAP Nhóm sản phẩm
+    // ===============================
+    const priorityMap: Record<string, number> = {
+      'Hóa chất': 0,
+      'Chất chuẩn (QC)': 1,
+      'Chất hiệu chuẩn (Cal)': 2,
+      'Phụ trợ': 3,
+    };
+
+    // ===============================
+    // 3. SORT
+    //    Nhóm xét nghiệm → Nhóm sản phẩm
+    // ===============================
+    explodedData.sort((a, b) => {
+      const testA = a.nhomXetNghiem ?? '';
+      const testB = b.nhomXetNghiem ?? '';
+
+      if (testA < testB) return -1;
+      if (testA > testB) return 1;
+
+      const priA = priorityMap[a.nhomSanPham ?? ''] ?? 99;
+      const priB = priorityMap[b.nhomSanPham ?? ''] ?? 99;
+
+      return priA - priB;
+    });
+
+    // ===============================
+    // 4. CHỈ GIỮ CỘT ĐANG HIỂN THỊ UI
+    // ===============================
     const visibleColumns = Object.keys(rows[0] ?? {});
 
-    // Chỉ giữ các cột này
-    const filteredData: RawData[] = json.data.map((row) => {
-    const filteredRow: RawData = {
-      InstrumentName: row.InstrumentName ?? null,
-      Test: row.Test ?? null,
-    };
+    const filteredData: RawData[] = explodedData.map((row) => {
+      const filteredRow: RawData = {
+        InstrumentName: row.InstrumentName ?? null,
+        Test: row.Test ?? null,
+      };
+
       visibleColumns.forEach((col) => {
         filteredRow[col] = row[col] ?? null;
       });
+
       return filteredRow;
     });
 
+    // ===============================
+    // 5. EXPORT EXCEL
+    // ===============================
     const worksheet = XLSX.utils.json_to_sheet(filteredData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'FilteredData');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const file = new Blob([excelBuffer], { type: 'application/octet-stream' });
+
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: 'xlsx',
+      type: 'array',
+    });
+
+    const file = new Blob([excelBuffer], {
+      type: 'application/octet-stream',
+    });
+
     saveAs(file, 'filtered_data.xlsx');
   };
+
 
 
   // UI
