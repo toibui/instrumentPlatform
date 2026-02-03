@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Select from 'react-select';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -42,7 +42,7 @@ export default function RawDataTableClient() {
   const limit = 50;
   const totalPages = Math.ceil(total / limit);
 
-  // Fetch dữ liệu bảng
+  // ====== Fetch dữ liệu bảng ======
   const fetchData = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -63,7 +63,7 @@ export default function RawDataTableClient() {
     fetchData();
   }, [fetchData]);
 
-  // Lấy quan hệ và nhóm máy
+  // ====== Fetch relations ======
   useEffect(() => {
     const fetchRelations = async () => {
       const res = await fetch('/api/relations');
@@ -94,7 +94,7 @@ export default function RawDataTableClient() {
     fetchRelations();
   }, []);
 
-  // Lấy danh sách loại sản phẩm
+  // ====== Fetch product types ======
   useEffect(() => {
     const fetchProductTypes = async () => {
       const res = await fetch('/api/typeofprod');
@@ -104,13 +104,12 @@ export default function RawDataTableClient() {
     fetchProductTypes();
   }, []);
 
-  // Khi chọn Test → lọc Instrument
+  // ====== Filter Instruments khi chọn Test ======
   useEffect(() => {
     if (selectedTests.length === 0) {
       setInstrumentNames(Object.values(instrumentGroups).flat());
       return;
     }
-
     const instrumentsFiltered = allRelations
       .filter((r) => selectedTests.includes(r.test))
       .map((r) => r.instrument);
@@ -118,7 +117,7 @@ export default function RawDataTableClient() {
     setInstrumentNames(Array.from(new Set(instrumentsFiltered)).sort());
   }, [selectedTests, allRelations, instrumentGroups]);
 
-  // Khi chọn Instrument → lọc Test
+  // ====== Filter Tests khi chọn Instrument ======
   useEffect(() => {
     if (selectedInstruments.length === 0) {
       setTestNames(Array.from(new Set(allRelations.map((r) => r.test))).sort());
@@ -132,47 +131,33 @@ export default function RawDataTableClient() {
     setTestNames(Array.from(new Set(testsFiltered)).sort());
   }, [selectedInstruments, allRelations]);
 
-  const exportToExcel = async () => {
-  const params = new URLSearchParams();
-  selectedInstruments.forEach((inst) => params.append('instrument', inst));
-  selectedTests.forEach((test) => params.append('test', test));
-  selectedProductTypes.forEach((prod) => params.append('typeofprod', prod));
+  // ====== processedRows: UI + Excel dùng chung ======
+  const processedRows: RawData[] = useMemo(() => {
+    if (!rows || rows.length === 0) return [];
 
-  const res = await fetch(`/api/reagenttest?${params.toString()}&all=true`);
-  const json = (await res.json()) as { data: RawData[]; total: number };
-
-  if (!json.data || json.data.length === 0) return;
-
-  // ===============================
-  // 1. EXPLODE Nhóm xét nghiệm
-  // ===============================
-    const explodedData: RawData[] = [];
-
-    json.data.forEach((item) => {
+    // 1. EXPLODE Nhóm xét nghiệm
+    const explodedData: RawData[] = rows.flatMap((item): RawData[] => {
       const rawTests = item['Nhóm xét nghiệm'];
       const nhomSanPham = item['Nhóm sản phẩm'] ?? null;
 
       if (typeof rawTests !== 'string') {
-        explodedData.push({
-          ...item,
-          nhomXetNghiem: rawTests ?? null,
+        return [{
+          nhomXetNghiem: rawTests != null ? String(rawTests) : null,
           nhomSanPham,
-        });
-        return;
+          InstrumentName: item.InstrumentName ?? null,
+          Test: item.Test ?? null,
+        }];
       }
 
-      rawTests.split(',').forEach((test) => {
-        explodedData.push({
-          ...item,
-          nhomXetNghiem: test.trim(),
-          nhomSanPham,
-        });
-      });
+      return rawTests.split(',').map((test) => ({
+        nhomXetNghiem: test.trim(),
+        nhomSanPham,
+        InstrumentName: item.InstrumentName ?? null,
+        Test: item.Test ?? null,
+      }));
     });
 
-    // ===============================
-    // 2. PRIORITY MAP Nhóm sản phẩm
-    // ===============================
+    // 2. PRIORITY MAP
     const priorityMap: Record<string, number> = {
       'Hóa chất': 0,
       'Chất chuẩn (QC)': 1,
@@ -180,10 +165,7 @@ export default function RawDataTableClient() {
       'Phụ trợ': 3,
     };
 
-    // ===============================
     // 3. SORT
-    //    Nhóm xét nghiệm → Nhóm sản phẩm
-    // ===============================
     explodedData.sort((a, b) => {
       const testA = a.nhomXetNghiem ?? '';
       const testB = b.nhomXetNghiem ?? '';
@@ -197,46 +179,34 @@ export default function RawDataTableClient() {
       return priA - priB;
     });
 
-    // ===============================
-    // 4. CHỈ GIỮ CỘT ĐANG HIỂN THỊ UI
-    // ===============================
+    // 4. GIỮ CỘT HIỂN THỊ
     const visibleColumns = Object.keys(rows[0] ?? {});
-
-    const filteredData: RawData[] = explodedData.map((row) => {
+    return explodedData.map((row) => {
       const filteredRow: RawData = {
         InstrumentName: row.InstrumentName ?? null,
         Test: row.Test ?? null,
       };
-
       visibleColumns.forEach((col) => {
         filteredRow[col] = row[col] ?? null;
       });
-
       return filteredRow;
     });
+  }, [rows]);
 
-    // ===============================
-    // 5. EXPORT EXCEL
-    // ===============================
-    const worksheet = XLSX.utils.json_to_sheet(filteredData);
+  // ====== Export Excel ======
+  const exportToExcel = () => {
+    if (!processedRows || processedRows.length === 0) return;
+
+    const worksheet = XLSX.utils.json_to_sheet(processedRows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'FilteredData');
 
-    const excelBuffer = XLSX.write(workbook, {
-      bookType: 'xlsx',
-      type: 'array',
-    });
-
-    const file = new Blob([excelBuffer], {
-      type: 'application/octet-stream',
-    });
-
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const file = new Blob([excelBuffer], { type: 'application/octet-stream' });
     saveAs(file, 'filtered_data.xlsx');
   };
 
-
-
-  // UI
+  // ====== UI Options ======
   const testOptions = testNames.map((name) => ({ value: name, label: name }));
   const productTypeOptions = productTypes.map((t) => ({ value: t, label: t }));
 
@@ -252,7 +222,6 @@ export default function RawDataTableClient() {
     <div>
       {/* Filter */}
       <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-        {/* Instrument theo nhóm có filter theo instrumentNames */}
         {Object.entries(instrumentGroups).map(([groupName, instruments]) => {
           const filteredInstruments = instruments.filter((name) =>
             instrumentNames.includes(name)
@@ -283,7 +252,7 @@ export default function RawDataTableClient() {
           );
         })}
 
-        {/* Filter Test */}
+        {/* Test Filter */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">🧪 Test Name</label>
           <Select
@@ -302,7 +271,7 @@ export default function RawDataTableClient() {
           />
         </div>
 
-        {/* Filter loại sản phẩm */}
+        {/* Product Type Filter */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">📦 Loại sản phẩm</label>
           <Select
@@ -319,7 +288,7 @@ export default function RawDataTableClient() {
         </div>
       </div>
 
-      {/* Nút Download Excel */}
+      {/* Download Excel */}
       <div className="flex justify-start mb-4">
         <button
           onClick={exportToExcel}
@@ -329,7 +298,7 @@ export default function RawDataTableClient() {
         </button>
       </div>
 
-      {/* Bảng */}
+      {/* Table */}
       {loading ? (
         <p>🔄 Loading...</p>
       ) : (
@@ -338,7 +307,7 @@ export default function RawDataTableClient() {
             <table className="table-auto w-full text-sm">
               <thead className="bg-gray-100">
                 <tr>
-                  {Object.keys(rows[0] ?? {}).map((key) => (
+                  {Object.keys(processedRows[0] ?? {}).map((key) => (
                     <th
                       key={key}
                       className={`px-4 py-2 text-left font-semibold border-b ${columnWidths[key] ?? ''} truncate`}
@@ -349,7 +318,7 @@ export default function RawDataTableClient() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, idx) => (
+                {processedRows.map((row, idx) => (
                   <tr key={idx} className="hover:bg-gray-50">
                     {Object.values(row).map((val, i) => (
                       <td key={i} className="px-4 py-2 border-b">{val}</td>
@@ -360,7 +329,7 @@ export default function RawDataTableClient() {
             </table>
           </div>
 
-          {/* Phân trang */}
+          {/* Pagination */}
           <div className="flex justify-between items-center mt-4">
             <p>
               Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
