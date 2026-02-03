@@ -146,13 +146,12 @@ export default function RawDataTableClient() {
   // ===============================
   // 1. EXPLODE Nhóm xét nghiệm
   // ===============================
-    let explodedData: RawData[] = [];
+    const explodedData: RawData[] = [];
 
     json.data.forEach((item) => {
       const rawTests = item['Nhóm xét nghiệm'];
       const nhomSanPham = item['Nhóm sản phẩm'] ?? null;
 
-      // Không phải string → giữ nguyên
       if (typeof rawTests !== 'string') {
         explodedData.push({
           ...item,
@@ -162,7 +161,6 @@ export default function RawDataTableClient() {
         return;
       }
 
-      // Split + explode
       rawTests.split(',').forEach((test) => {
         explodedData.push({
           ...item,
