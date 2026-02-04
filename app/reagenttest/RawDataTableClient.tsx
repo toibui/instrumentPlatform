@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Select from 'react-select';
 import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
 
 interface RawData {
   InstrumentName: string | null;
@@ -38,27 +37,37 @@ export default function RawDataTableClient() {
   const [rows, setRows] = useState<RawData[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-
+  const [useSummaryApi, setUseSummaryApi] = useState(true);
   const limit = 50;
   const totalPages = Math.ceil(total / limit);
 
   // ====== Fetch dữ liệu bảng ======
   const fetchData = useCallback(async () => {
     setLoading(true);
+
     const params = new URLSearchParams();
     selectedInstruments.forEach((inst) => params.append('instrument', inst));
     selectedTests.forEach((test) => params.append('test', test));
     selectedProductTypes.forEach((prod) => params.append('typeofprod', prod));
     params.set('page', page.toString());
 
-    const res = await fetch(`/api/reagenttest?${params.toString()}`);
+    const apiUrl = useSummaryApi
+      ? `/api/reagenttest?${params.toString()}`
+      : `/api/reagenttestdetail?${params.toString()}`;
+
+    const res = await fetch(apiUrl);
     const json = await res.json();
 
     setRows(json.data);
     setTotal(json.total);
     setLoading(false);
-  }, [selectedInstruments, selectedTests, selectedProductTypes, page]);
-
+  }, [
+    selectedInstruments,
+    selectedTests,
+    selectedProductTypes,
+    page,
+    useSummaryApi, // ⚠️ nhớ thêm dependency
+  ]);
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -251,15 +260,29 @@ export default function RawDataTableClient() {
         </div>
       </div>
 
+    {/* Download + Toggle */}
+    <div className="flex items-center justify-between mb-4">
       {/* Download Excel */}
-      <div className="flex justify-start mb-4">
-        <button
-          onClick={() => exportExcel(processedRows)}
-          className="flex items-center justify-center gap-2 bg-green-600 text-white font-semibold px-4 py-2 rounded-xl shadow hover:bg-green-700 transition"
-        >
-          📥 Download Excel
-        </button>
-      </div>
+      <button
+        onClick={() => exportExcel(processedRows)}
+        className="flex items-center justify-center gap-2 bg-green-600 text-white font-semibold px-4 py-2 rounded-xl shadow hover:bg-green-700 transition"
+      >
+        📥 Download Excel
+      </button>
+
+      {/* Toggle */}
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={useSummaryApi}
+          onChange={(e) => {
+            setUseSummaryApi(e.target.checked);
+            setPage(1);
+          }}
+        />
+        <span>Danh sách tổng hợp</span>
+      </label>
+    </div>
 
       {/* Table */}
       {loading ? (

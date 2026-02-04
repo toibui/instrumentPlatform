@@ -15,75 +15,81 @@ export async function GET(req: Request) {
   const offset = (page - 1) * limit;
   const conditions: string[] = [];
 
-  // Bộ lọc theo instrument
+  // --- Bộ lọc instrument ---
   if (instruments.length > 0) {
     const ilikeConditions = instruments
-      .map((i) => `"InstrumentName" ILIKE '%${i}%'`)
+      .map((i) => `rd."InstrumentName" ILIKE '%${i}%'`)
       .join(' OR ');
     conditions.push(`(${ilikeConditions})`);
   }
 
-  // Bộ lọc theo test
+  // --- Bộ lọc test ---
   if (tests.length > 0) {
     const quoted = tests.map((t) => `'${t}'`).join(', ');
-    if (instruments.length > 0) {
-      // Nếu có cả instrument và test → test IN list hoặc rỗng
-      conditions.push(`("Parametershort" IN (${quoted}) OR "Parametershort" = '')`);
-    } else {
-      conditions.push(`"Parametershort" IN (${quoted})`);
-    }
+    conditions.push(`
+      (
+        rd."Parametershort" IN (${quoted}) 
+        or nx."Parametershort" IN (${quoted})
+      )
+    `);
   }
 
-  // Bộ lọc theo type
+  // --- Bộ lọc type ---
   if (types.length > 0) {
     const quoted = types.map((t) => `'${t}'`).join(', ');
-    conditions.push(`"UsageType" IN (${quoted})`);
+    conditions.push(`rd."UsageType" IN (${quoted})`);
   }
 
-  // WHERE clause
+  // --- WHERE clause động ---
   const whereSQL = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  // Raw SQL truy vấn dữ liệu
+  // --- SQL chính ---
   const baseSelect = `
+    WITH nhom_xet_nghiem AS (
+        SELECT DISTINCT "Parametershort", "InstrumentName"
+        FROM "raw_data"
+        WHERE "Parametershort" IS NOT NULL
+          AND TRIM("Parametershort") <> ''
+    )
     SELECT
-      "PL6",
-      "MaterialNumber",
-      "Material_Name",
-      "UsageType" AS "Nhóm sản phẩm",
-      STRING_AGG(DISTINCT "InstrumentName", ', ') AS "InstrumentName",
-      STRING_AGG(
-        DISTINCT NULLIF(TRIM("Parametershort"), ''),
-        ', '
-      ) AS "Parametershort"
-    FROM "raw_data"
+        rd."PL6",
+        rd."MaterialNumber",
+        rd."Material_Name",
+        rd."UsageType" AS "Nhóm sản phẩm",
+        rd."InstrumentName",
+        COALESCE(
+            NULLIF(TRIM(rd."Parametershort"), ''),
+            nx."Parametershort"
+        ) AS "Nhóm xét nghiệm"
+    FROM "raw_data" rd
+    LEFT JOIN nhom_xet_nghiem nx
+        ON (rd."Parametershort" IS NULL OR TRIM(rd."Parametershort") = '')
+        AND nx."InstrumentName" = rd."InstrumentName"
     ${whereSQL}
-    GROUP BY
-      "PL6",
-      "MaterialNumber",
-      "Material_Name",
-      "UsageType"
     ORDER BY
-      CASE "UsageType"
-        WHEN 'Hóa chất' THEN 0
-        WHEN 'Chất chuẩn (QC)' THEN 1
-        WHEN 'Chất hiệu chuẩn (Cal)' THEN 2
-        WHEN 'Phụ trợ' THEN 3
-        ELSE 99
-      END,
-      "PL6"
-  `; // ❌ KHÔNG dấu ; ở cuối
+        rd."InstrumentName",
+        "Nhóm xét nghiệm",
+        CASE rd."UsageType"
+            WHEN 'Hóa chất' THEN 0
+            WHEN 'Chất chuẩn (QC)' THEN 1
+            WHEN 'Chất hiệu chuẩn (Cal)' THEN 2
+            WHEN 'Phụ trợ' THEN 3
+            ELSE 99
+        END,
+        rd."PL6"
+  `;
 
   const dataQuery = isExportAll
     ? baseSelect
-    : `${baseSelect} LIMIT ${limit} OFFSET ${offset};`;
+    : `${baseSelect} LIMIT ${limit} OFFSET ${offset}`;
 
   const countQuery = `
     SELECT COUNT(*) FROM (
       ${baseSelect}
-    ) AS subquery;
+    ) AS subquery
   `;
 
-  // Thực thi truy vấn
+  // --- Thực thi ---
   const dataResult = await db.execute(sql.raw(dataQuery));
   let total = 0;
 
