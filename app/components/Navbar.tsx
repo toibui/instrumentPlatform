@@ -11,7 +11,7 @@ export default function Navbar() {
     { href: '/reagInstruments', label: 'Hóa chất theo máy' },
     { href: '/reagenttest', label: 'Hóa chất theo xét nghiệm' },
     { href: '/innovations', label: 'Hóa chất chuyển đổi AMS, Biotin, FLIRT, ESPS' },
-    { href: '/waitingpage', label: 'Chuyển đổi danh mục' }
+    { href: '/compares', label: 'Chuyển đổi danh mục' }
   ];
 
   return (
