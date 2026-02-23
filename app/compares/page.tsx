@@ -127,7 +127,7 @@ export default function TestTable() {
   // ==========================
   const check = (input: number, obs: number | null) => {
     if (obs == null) return ""
-    return input <= obs ? "PASS" : "FAIL"
+    return input >= obs ? "PASS" : "FAIL"
   }
 
   // ==========================
