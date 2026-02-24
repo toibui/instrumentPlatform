@@ -60,7 +60,9 @@ export async function GET(req: Request) {
         COALESCE(
             NULLIF(TRIM(rd."Parametershort"), ''),
             nx."Parametershort"
-        ) AS "Nhóm xét nghiệm"
+        ) AS "Nhóm xét nghiệm",
+        rd."Dự án",
+        rd."Dự kiến"
     FROM "raw_data" rd
     LEFT JOIN nhom_xet_nghiem nx
         ON (rd."Parametershort" IS NULL OR TRIM(rd."Parametershort") = '')

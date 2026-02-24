@@ -17,17 +17,21 @@ type DataType = {
   "Application short name": string
   "Long name": string
 
-  N_of_tests: string | null
-  O_of_tests: string | null
-  O1_of_tests: string | null
+  "pro/pure_Đóng gói": string | null
+  "4000/6000/8000_Đóng gói": string | null
+  "c702_Đóng gói": string | null
 
-  N_OBS: string | null
-  O_OBS: string | null
-  O1_OBS: string | null
+  "pro/pure_Ổn định": string | null
+  "4000/6000/8000_Ổn định": string | null
+  "c702_Ổn định": string | null
 
-  N_of_tests_OBS: number | null
-  O_of_tests_OBS: number | null
-  O1_of_tests_OBS: number | null
+  "c702_Material": string | null
+  "4000/6000/8000_Material": string | null
+  "pro/pure_Material": string | null
+
+  "pro/pure_Định lượng": number | null
+  "4000/6000/8000_Định lượng": number | null
+  "c702_Định lượng": number | null
 }
 
 
@@ -58,23 +62,27 @@ export default function TestTable() {
       Application: row["Application short name"],
       LongName: row["Long name"],
 
-      N_tests_OBS: row.N_of_tests_OBS,
-      O_tests_OBS: row.O_of_tests_OBS,
-      O1_tests_OBS: row.O1_of_tests_OBS,
+      N_tests_OBS: row["pro/pure_Định lượng"],
+      O_tests_OBS: row["4000/6000/8000_Định lượng"],
+      O1_tests_OBS: row["c702_Định lượng"],
 
       Test_per_Day: input,
 
-      N_Result: check(input, row.N_of_tests_OBS),
-      O_Result: check(input, row.O_of_tests_OBS),
-      O1_Result: check(input, row.O1_of_tests_OBS),
+      N_Result: check(input, row["pro/pure_Định lượng"]),
+      O_Result: check(input, row["4000/6000/8000_Định lượng"]),
+      O1_Result: check(input, row["c702_Định lượng"]),
 
-      N_Tests: row.N_of_tests,
-      O_Tests: row.O_of_tests,
-      O1_Tests: row.O1_of_tests,
+      N_Tests: row["pro/pure_Đóng gói"],
+      O_Tests: row["4000/6000/8000_Đóng gói"],
+      O1_Tests: row["c702_Đóng gói"],
 
-      N_OBS: row.N_OBS,
-      O_OBS: row.O_OBS,
-      O1_OBS: row.O1_OBS,
+      N_OBS: row["pro/pure_Ổn định"],
+      O_OBS: row["4000/6000/8000_Ổn định"],
+      O1_OBS: row["c702_Ổn định"],
+
+      c702_Material: row["c702_Material"],
+      M4000_Material: row["4000/6000/8000_Material"],
+      pro_Material: row["pro/pure_Material"],
 
       Category: row.Category,
       Indication: row["Indication area"],
@@ -142,9 +150,9 @@ export default function TestTable() {
 
 
 
-    { accessorKey: "N_of_tests_OBS", header: "N_tests/OBS" },
-    { accessorKey: "O_of_tests_OBS", header: "O_tests/OBS" },
-    { accessorKey: "O1_of_tests_OBS", header: "O1_tests/OBS" },
+    { accessorKey: "pro/pure_Định lượng", header: "Định lượng (pro/pure)" },
+    { accessorKey: "4000/6000/8000_Định lượng", header: "Định lượng (4000/6000/8000)" },
+    { accessorKey: "c702_Định lượng", header: "Định lượng (c702)" },
 
     {
       header: "Test/Day",
@@ -172,7 +180,7 @@ export default function TestTable() {
       header: "N Result",
       cell: ({ row }) => {
         const input = rowInputs[row.index] ?? globalTest
-        const result = check(input, row.original.N_of_tests_OBS)
+        const result = check(input, row.original["pro/pure_Định lượng"])
 
         return (
           <span className={result === "FAIL" ? "text-red-600" : "text-green-600"}>
@@ -186,7 +194,7 @@ export default function TestTable() {
       header: "O Result",
       cell: ({ row }) => {
         const input = rowInputs[row.index] ?? globalTest
-        const result = check(input, row.original.O_of_tests_OBS)
+        const result = check(input, row.original["4000/6000/8000_Định lượng"])
 
         return (
           <span className={result === "FAIL" ? "text-red-600" : "text-green-600"}>
@@ -200,7 +208,7 @@ export default function TestTable() {
       header: "O1 Result",
       cell: ({ row }) => {
         const input = rowInputs[row.index] ?? globalTest
-        const result = check(input, row.original.O1_of_tests_OBS)
+        const result = check(input, row.original["c702_Định lượng"])
 
         return (
           <span className={result === "FAIL" ? "text-red-600" : "text-green-600"}>
@@ -209,13 +217,16 @@ export default function TestTable() {
         )
       },
     },
-    { accessorKey: "N_of_tests", header: "N Tests" },
-    { accessorKey: "O_of_tests", header: "O Tests" },
-    { accessorKey: "O1_of_tests", header: "O1 Tests" },
+    { accessorKey: "pro/pure_Đóng gói", header: "Đóng gói (pro/pure)" },
+    { accessorKey: "4000/6000/8000_Đóng gói", header: "Đóng gói (4000/6000/8000)" },
+    { accessorKey: "c702_Đóng gói", header: "Đóng gói (c702)" },
 
-    { accessorKey: "N_OBS", header: "N OBS" },
-    { accessorKey: "O_OBS", header: "O OBS" },
-    { accessorKey: "O1_OBS", header: "O1 OBS" },
+    { accessorKey: "pro/pure_Ổn định", header: "Ổn định (pro/pure)" },
+    { accessorKey: "4000/6000/8000_Ổn định", header: "Ổn định (4000/6000/8000)" },
+    { accessorKey: "c702_Ổn định", header: "Ổn định (c702)" },
+    { accessorKey: "c702_Material", header: "Material (c702)" },
+    { accessorKey: "pro/pure_Material", header: "Material (pro/pure)" },
+    { accessorKey: "4000/6000/8000_Material", header: "Material (4000/6000/8000)" },
     { accessorKey: "Category", header: "Category" },
     { accessorKey: "Indication area", header: "Indication Area" },
   ]

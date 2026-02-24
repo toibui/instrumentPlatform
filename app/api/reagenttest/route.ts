@@ -54,14 +54,19 @@ export async function GET(req: Request) {
       STRING_AGG(
         DISTINCT NULLIF(TRIM("Parametershort"), ''),
         ', '
-      ) AS "Parametershort"
+      ) AS "Parametershort",
+       "Dự án",
+       "Dự kiến"
+       
     FROM "raw_data"
     ${whereSQL}
     GROUP BY
       "PL6",
       "MaterialNumber",
       "Material_Name",
-      "UsageType"
+      "UsageType",
+      "Dự án",
+      "Dự kiến"
     ORDER BY
       CASE "UsageType"
         WHEN 'Hóa chất' THEN 0
