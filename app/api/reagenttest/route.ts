@@ -13,38 +13,49 @@ export async function GET(req: Request) {
 
   const limit = 50;
   const offset = (page - 1) * limit;
-  const conditions: string[] = [];
 
-  // Bộ lọc theo instrument
+  const conditions: any[] = [];
+
+  // ===== Instrument filter =====
   if (instruments.length > 0) {
-    const ilikeConditions = instruments
-      .map((i) => `"InstrumentName" ILIKE '%${i}%'`)
-      .join(' OR ');
-    conditions.push(`(${ilikeConditions})`);
+    const instrumentConditions = instruments.map((i) =>
+      sql`"InstrumentName" ILIKE ${'%' + i + '%'}`
+    );
+
+    conditions.push(sql`(${sql.join(instrumentConditions, sql` OR `)})`);
   }
 
-  // Bộ lọc theo test
+  // ===== Test filter =====
   if (tests.length > 0) {
-    const quoted = tests.map((t) => `'${t}'`).join(', ');
+    const testList = sql.join(
+      tests.map((t) => sql`${t}`),
+      sql`,`
+    );
+
     if (instruments.length > 0) {
-      // Nếu có cả instrument và test → test IN list hoặc rỗng
-      conditions.push(`("Parametershort" IN (${quoted}) OR "Parametershort" = '')`);
+      conditions.push(
+        sql`("Parametershort" IN (${testList}) OR "Parametershort" = '')`
+      );
     } else {
-      conditions.push(`"Parametershort" IN (${quoted})`);
+      conditions.push(sql`"Parametershort" IN (${testList})`);
     }
   }
 
-  // Bộ lọc theo type
+  // ===== UsageType filter =====
   if (types.length > 0) {
-    const quoted = types.map((t) => `'${t}'`).join(', ');
-    conditions.push(`"UsageType" IN (${quoted})`);
+    const typeList = sql.join(
+      types.map((t) => sql`${t}`),
+      sql`,`
+    );
+    conditions.push(sql`"UsageType" IN (${typeList})`);
   }
 
-  // WHERE clause
-  const whereSQL = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const whereClause =
+    conditions.length > 0
+      ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
+      : sql``;
 
-  // Raw SQL truy vấn dữ liệu
-  const baseSelect = `
+  const baseQuery = sql`
     SELECT
       "PL6",
       "MaterialNumber",
@@ -55,11 +66,10 @@ export async function GET(req: Request) {
         DISTINCT NULLIF(TRIM("Parametershort"), ''),
         ', '
       ) AS "Parametershort",
-       "Dự án",
-       "Dự kiến"
-       
+      "Dự án",
+      "Dự kiến"
     FROM "raw_data"
-    ${whereSQL}
+    ${whereClause}
     GROUP BY
       "PL6",
       "MaterialNumber",
@@ -76,28 +86,27 @@ export async function GET(req: Request) {
         ELSE 99
       END,
       "PL6"
-  `; // ❌ KHÔNG dấu ; ở cuối
-
-  const dataQuery = isExportAll
-    ? baseSelect
-    : `${baseSelect} LIMIT ${limit} OFFSET ${offset};`;
-
-  const countQuery = `
-    SELECT COUNT(*) FROM (
-      ${baseSelect}
-    ) AS subquery;
   `;
 
-  // Thực thi truy vấn
-  const dataResult = await db.execute(sql.raw(dataQuery));
+  // ===== DATA QUERY =====
+  const dataQuery = isExportAll
+    ? baseQuery
+    : sql`${baseQuery} LIMIT ${limit} OFFSET ${offset}`;
+
+  const dataResult = await db.execute(dataQuery);
+
+  // ===== COUNT (chỉ khi không export) =====
   let total = 0;
 
   if (!isExportAll) {
-    const countResult = await db.execute(sql.raw(countQuery));
-    total =
-      Array.isArray(countResult) && countResult.length > 0
-        ? Number((countResult[0] as { count: string }).count)
-        : 0;
+    const countQuery = sql`
+      SELECT COUNT(*) FROM (
+        ${baseQuery}
+      ) AS subquery
+    `;
+
+    const countResult = await db.execute(countQuery);
+    total = Number((countResult[0] as any).count);
   }
 
   return NextResponse.json({

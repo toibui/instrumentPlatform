@@ -163,18 +163,26 @@ export default function RawDataTableClient() {
     return rows; // trả về nguyên bản, không thay đổi gì
   }, [rows]);
 
-  // ====== Export Excel ======
-  function exportExcel(rows: RawData[]) {
-    if (!rows || rows.length === 0) return;
+  async function exportExcelFull() {
+    const params = new URLSearchParams();
+    selectedInstruments.forEach((inst) => params.append('instrument', inst));
+    selectedTests.forEach((test) => params.append('test', test));
+    selectedProductTypes.forEach((prod) => params.append('typeofprod', prod));
+    
+    params.set('all', 'true'); // ⚡ export toàn bộ
 
-    // Chỉ chuyển nguyên rows sang worksheet, không xử lý gì
-    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const apiUrl = useSummaryApi
+      ? `/api/reagenttest?${params.toString()}`
+      : `/api/reagenttestdetail?${params.toString()}`;
 
-    // Tạo workbook và append sheet
+    const res = await fetch(apiUrl);
+    const json = await res.json();
+
+    if (!json.data || json.data.length === 0) return;
+
+    const worksheet = XLSX.utils.json_to_sheet(json.data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
-
-    // Xuất file
     XLSX.writeFile(workbook, 'export.xlsx');
   }
   
@@ -264,7 +272,7 @@ export default function RawDataTableClient() {
     <div className="flex items-center justify-between mb-4">
       {/* Download Excel */}
       <button
-        onClick={() => exportExcel(processedRows)}
+        onClick={exportExcelFull}
         className="flex items-center justify-center gap-2 bg-green-600 text-white font-semibold px-4 py-2 rounded-xl shadow hover:bg-green-700 transition"
       >
         📥 Download Excel

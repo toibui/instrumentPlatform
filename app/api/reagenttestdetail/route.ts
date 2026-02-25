@@ -13,94 +13,91 @@ export async function GET(req: Request) {
 
   const limit = 50;
   const offset = (page - 1) * limit;
-  const conditions: string[] = [];
 
-  // --- Bộ lọc instrument ---
+  const conditions: any[] = [];
+
+  // --- Filter instruments ---
   if (instruments.length > 0) {
-    const ilikeConditions = instruments
-      .map((i) => `rd."InstrumentName" ILIKE '%${i}%'`)
-      .join(' OR ');
-    conditions.push(`(${ilikeConditions})`);
+    const instrumentConditions = instruments.map((i) =>
+      sql`rd."InstrumentName" ILIKE ${'%' + i + '%'}`
+    );
+    conditions.push(sql`(${sql.join(instrumentConditions, sql` OR `)})`);
   }
 
-  // --- Bộ lọc test ---
+  // --- Filter tests ---
   if (tests.length > 0) {
-    const quoted = tests.map((t) => `'${t}'`).join(', ');
-    conditions.push(`
+    const testList = sql.join(tests.map((t) => sql`${t}`), sql`,`);
+    conditions.push(sql`
       (
-        rd."Parametershort" IN (${quoted}) 
-        or nx."Parametershort" IN (${quoted})
+        rd."Parametershort" IN (${testList}) 
+        OR nx."Parametershort" IN (${testList})
       )
     `);
   }
 
-  // --- Bộ lọc type ---
+  // --- Filter types ---
   if (types.length > 0) {
-    const quoted = types.map((t) => `'${t}'`).join(', ');
-    conditions.push(`rd."UsageType" IN (${quoted})`);
+    const typeList = sql.join(types.map((t) => sql`${t}`), sql`,`);
+    conditions.push(sql`rd."UsageType" IN (${typeList})`);
   }
 
-  // --- WHERE clause động ---
-  const whereSQL = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const whereClause =
+    conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
-  // --- SQL chính ---
-  const baseSelect = `
+  // --- Base SQL ---
+  const baseQuery = sql`
     WITH nhom_xet_nghiem AS (
-        SELECT DISTINCT "Parametershort", "InstrumentName"
-        FROM "raw_data"
-        WHERE "Parametershort" IS NOT NULL
-          AND TRIM("Parametershort") <> ''
+      SELECT DISTINCT "Parametershort", "InstrumentName"
+      FROM "raw_data"
+      WHERE "Parametershort" IS NOT NULL
+        AND TRIM("Parametershort") <> ''
     )
     SELECT
-        rd."PL6",
-        rd."MaterialNumber",
-        rd."Material_Name",
-        rd."UsageType" AS "Nhóm sản phẩm",
-        rd."InstrumentName",
-        COALESCE(
-            NULLIF(TRIM(rd."Parametershort"), ''),
-            nx."Parametershort"
-        ) AS "Nhóm xét nghiệm",
-        rd."Dự án",
-        rd."Dự kiến"
+      rd."PL6",
+      rd."MaterialNumber",
+      rd."Material_Name",
+      rd."UsageType" AS "Nhóm sản phẩm",
+      rd."InstrumentName",
+      COALESCE(NULLIF(TRIM(rd."Parametershort"), ''), nx."Parametershort") AS "Nhóm xét nghiệm",
+      rd."Dự án",
+      rd."Dự kiến"
     FROM "raw_data" rd
     LEFT JOIN nhom_xet_nghiem nx
-        ON (rd."Parametershort" IS NULL OR TRIM(rd."Parametershort") = '')
-        AND nx."InstrumentName" = rd."InstrumentName"
-    ${whereSQL}
+      ON (rd."Parametershort" IS NULL OR TRIM(rd."Parametershort") = '')
+      AND nx."InstrumentName" = rd."InstrumentName"
+    ${whereClause}
     ORDER BY
-        rd."InstrumentName",
-        "Nhóm xét nghiệm",
-        CASE rd."UsageType"
-            WHEN 'Hóa chất' THEN 0
-            WHEN 'Chất chuẩn (QC)' THEN 1
-            WHEN 'Chất hiệu chuẩn (Cal)' THEN 2
-            WHEN 'Phụ trợ' THEN 3
-            ELSE 99
-        END,
-        rd."PL6"
+      rd."InstrumentName",
+      "Nhóm xét nghiệm",
+      CASE rd."UsageType"
+        WHEN 'Hóa chất' THEN 0
+        WHEN 'Chất chuẩn (QC)' THEN 1
+        WHEN 'Chất hiệu chuẩn (Cal)' THEN 2
+        WHEN 'Phụ trợ' THEN 3
+        ELSE 99
+      END,
+      rd."PL6"
   `;
 
+  // --- Data query ---
   const dataQuery = isExportAll
-    ? baseSelect
-    : `${baseSelect} LIMIT ${limit} OFFSET ${offset}`;
+    ? baseQuery
+    : sql`${baseQuery} LIMIT ${limit} OFFSET ${offset}`;
 
-  const countQuery = `
-    SELECT COUNT(*) FROM (
-      ${baseSelect}
-    ) AS subquery
-  `;
+  const dataResult = await db.execute(dataQuery);
 
-  // --- Thực thi ---
-  const dataResult = await db.execute(sql.raw(dataQuery));
+  // --- Count only when not exporting ---
   let total = 0;
-
   if (!isExportAll) {
-    const countResult = await db.execute(sql.raw(countQuery));
-    total =
-      Array.isArray(countResult) && countResult.length > 0
-        ? Number((countResult[0] as { count: string }).count)
-        : 0;
+    const countQuery = sql`
+      SELECT COUNT(*) FROM (
+        ${baseQuery}
+      ) AS subquery
+    `;
+    const countResult = await db.execute(countQuery);
+    total = Array.isArray(countResult) && countResult.length > 0
+      ? Number((countResult[0] as any).count)
+      : 0;
   }
 
   return NextResponse.json({
